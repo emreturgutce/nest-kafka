@@ -1,0 +1,58 @@
+version: '3'
+services:
+  consumer:
+    build:
+      context: consumer
+      dockerfile: Dockerfile
+    restart: on-failure
+    environment:
+      TOPIC_NAME: users
+      KAFKA_BROKER_URL: kafka1:19091
+      KAFKA_CLIENT_ID: kafka-node
+    depends_on:
+      - zookeeper
+      - kafka1
+    volumes:
+      - /app/node_modules
+      - ./consumer:/app
+  producer:
+    build:
+      context: producer
+      dockerfile: Dockerfile
+    restart: on-failure
+    ports:
+      - '8080:8080'
+    environment:
+      PORT: 8080
+      TOPIC_NAME: users
+      KAFKA_BROKER_URL: kafka1:19091
+      KAFKA_CLIENT_ID: kafka-node
+    depends_on:
+      - consumer
+      - zookeeper
+      - kafka1
+    volumes:
+      - /app/node_modules
+      - ./producer:/app
+  zookeeper:
+    image: zookeeper:3.4.9
+    hostname: zookeeper
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    volumes:
+      - ./data/zookeeper/data:/data
+      - ./data/zookeeper/datalog:/datalog
+  kafka1:
+    image: confluentinc/cp-kafka:5.3.0
+    hostname: kafka1
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_INTERNAL://kafka1:19091,LISTENER_DOCKER_EXTERNAL://${DOCKER_HOST_IP:-127.0.0.1}:9091
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
